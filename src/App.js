@@ -3,21 +3,39 @@ import logo from './logo.svg';
 import './App.css';
 import { css } from 'glamor'
 import Amplify, { Analytics } from 'aws-amplify';
+import { API, graphqlOperation } from 'aws-amplify'
 import aws_exports from './aws-exports';
 import { withAuthenticator } from 'aws-amplify-react';
-
+import '@aws-amplify/ui/dist/style.css';
 import Form from './components/Form';
 import Notes from './components/Notes';
+import { createNote, updateNote, deleteNote } from './graphql/mutations'
+import { listNotes } from './graphql/queries'
 
 Amplify.configure(aws_exports);
 
 class App extends Component {
   state = { notes: [], filter: 'none' }
 
+  async componentDidMount() {
+    try {
+      const { data: { listNotes: { items }}} = await API.graphql(graphqlOperation(listNotes))
+      this.setState({ notes: items })
+    } catch (err) {
+      console.log('error fetching notes...', err)
+    }
+  }
+
   createNote = async note => {
     const notes = [note, ...this.state.notes]
     const newNotes = this.state.notes
     this.setState({ notes })
+    try {
+      const data = await API.graphql(graphqlOperation(createNote, { input: note }))
+      this.setState({ notes: [data.data.createNote, ...newNotes] })
+    } catch (err) {
+      console.log('error creating note..', err)
+    }
   }
   
   updateNote = async note => {
@@ -29,12 +47,23 @@ class App extends Component {
     const notes = [...this.state.notes]
     notes[index] = updatedNote
     this.setState({ notes })
+  
+    try {
+      await API.graphql(graphqlOperation(updateNote, { input: updatedNote }))
+    } catch (err) {
+      console.log('error updating note...', err)
+    }
   }
   
   deleteNote = async note => {
     const input = { id: note.id }
     const notes = this.state.notes.filter(n => n.id !== note.id)
     this.setState({ notes })
+    try {
+      await API.graphql(graphqlOperation(deleteNote, { input }))
+    } catch (err) {
+      console.log('error deleting note...', err)
+    }
   }
   
   updateFilter = filter => this.setState({ filter })
@@ -107,4 +136,4 @@ const styles = {
   }
 }
 
-export default withAuthenticator(App, { includeGreetings: true })
+export default withAuthenticator(App, { includeGreetings: true });
